@@ -279,7 +279,7 @@
 
   /* Marcador de versão: aparece em "Sobre o protótipo" e ajuda a saber
      se o navegador está mostrando a versão nova ou uma guardada em cache. */
-  var VERSION = '4 · câmera automática';
+  var VERSION = '5 · sem dependências externas';
 
   global.JOVI_DATA = {
     VERSION: VERSION,

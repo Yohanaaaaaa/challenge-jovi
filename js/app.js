@@ -26,7 +26,7 @@
       profile: { nivel: 'Iniciante', objetivo: 'Fotos do dia a dia', estilo: 'Natural' },
 
       camera: { mode: 'foto', model: 'paisagem', flash: 'off', hdr: true, ai: true, ratio: '3:4', zoom: 1, front: false, timer: 0 },
-      settings: { grade: false, som: true, espelhar: true, local: false, iaAuto: true },
+      settings: { grade: false, som: true, espelhar: true, local: false, iaAuto: true, guardarFotos: false },
 
       look: Object.assign({}, D.STYLE_VALUES['Natural']),
       lookName: 'Estilo Natural',
@@ -87,9 +87,14 @@
       .filter(function (s) { return !s.video; })
       .map(function (s) { return Object.assign({}, s); });
 
+    /* Por padrão a imagem não é gravada: o localStorage é compartilhado por
+       todas as páginas da mesma origem, e no GitHub Pages isso inclui os
+       outros projetos publicados no mesmo domínio. Quem quiser manter as
+       fotos entre sessões liga a opção em Ajustes. */
     var kept = 0;
     shots.forEach(function (s) {
       if (!s.src) return;
+      if (!state.settings.guardarFotos) { delete s.src; return; }
       kept++;
       if (kept > KEEP_IMAGES) delete s.src;
     });
@@ -861,7 +866,8 @@
     if (!el) return;
     var act = el.getAttribute('data-act');
     var arg = el.getAttribute('data-arg');
-    if (!actions[act]) return;
+    /* só ações declaradas: evita cair em membros herdados de Object.prototype */
+    if (!Object.prototype.hasOwnProperty.call(actions, act)) return;
 
     /* qualquer ação vinda da folha modal fecha a folha antes de seguir */
     if (el.closest('#jv-sheet') && act !== 'sheet-close') U.closeSheet();
@@ -910,7 +916,9 @@
 
   /* Link direto para uma tela: index.html#/camera, #/comunidade, ... */
   var deep = (location.hash || '').replace(/^#\/?/, '');
-  if (deep && S[deep]) {
+  /* hasOwnProperty e não `S[deep]`: nomes herdados de Object.prototype
+     ("constructor", "toString"…) passariam na checagem e quebrariam a tela */
+  if (deep && Object.prototype.hasOwnProperty.call(S, deep)) {
     if (deep !== 'splash' && deep !== 'onboarding') state.onboarded = true;
     if (deep === 'preset' && !state.viewPreset) {
       state.viewPreset = D.PRESETS[0];

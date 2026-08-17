@@ -12,11 +12,9 @@ frameworks de JS, sem imagens externas.
 ## Como executar
 
 Abra o arquivo `index.html` no navegador (duplo clique já funciona).
-Não há instalação nem etapa de build.
-
-> O Tailwind é carregado por CDN, então a primeira abertura precisa de internet.
-> Todo o resto — layout, componentes, animações e as “fotos” — está em
-> `css/styles.css`, que é local.
+Não há instalação, etapa de build nem dependência de internet: o Tailwind é
+servido pelo próprio projeto (`vendor/tailwind.js`), e todo o resto — layout,
+componentes, animações e as “fotos” — está em `css/styles.css`.
 
 **Para usar a câmera de verdade**, o app precisa estar servido por HTTPS ou
 `localhost`: os navegadores bloqueiam `getUserMedia` em `file://`. Publicado no
@@ -54,7 +52,10 @@ challenge-jovi/
 ├── index.html          moldura do app, ícones SVG e painel lateral (desktop)
 ├── css/
 │   └── styles.css      tokens, componentes, câmera, cenas em CSS art, animações
+├── vendor/
+│   └── tailwind.js     Tailwind CSS, cópia local (sem CDN de terceiros)
 └── js/
+    ├── tailwind-config.js  paleta e fontes do Tailwind
     ├── data.js         modos, configurações da comunidade, dicas, onboarding
     ├── camera.js       câmera do aparelho: getUserMedia, captura e gravação
     ├── ui.js           helpers de marcação, cenas, filtros, toast e folha modal
@@ -164,6 +165,33 @@ delegação de eventos com `data-act` / `data-arg`, então não há listeners
 espalhados nem vazamento entre telas.
 
 ---
+
+## Segurança e privacidade
+
+Não há banco de dados nem servidor: o projeto é um site estático e **não faz
+nenhuma chamada de rede** (sem `fetch`, `XMLHttpRequest`, `WebSocket` ou
+`sendBeacon`). Também não há `eval`, `new Function` ou `document.write`.
+As decisões tomadas por causa disso:
+
+- **Nada vem de fora.** O Tailwind é servido pelo próprio site. Antes vinha de
+  um CDN de terceiros, que rodava com acesso total à página — e, portanto, ao
+  `localStorage` e à câmera já autorizada.
+- **Política de segurança de conteúdo** declarada no `index.html`:
+  `default-src 'none'`, `script-src 'self'`, `connect-src 'none'`. Nenhuma foto
+  consegue ser enviada para lugar nenhum, mesmo que algo desse errado.
+  (`'unsafe-inline'` aparece só em `style-src`, por causa dos atributos `style`
+  das telas e da folha que o Tailwind injeta.)
+- **Fotos não são gravadas por padrão.** O `localStorage` é compartilhado por
+  todas as páginas da mesma origem — no GitHub Pages, isso inclui os outros
+  projetos publicados no mesmo domínio. As capturas ficam só na sessão; quem
+  quiser mantê-las liga a opção em *Ajustes → Privacidade*.
+- **A câmera é encerrada ao sair do visor**, e o vídeo gravado fica em `blob:`,
+  que não sobrevive ao recarregamento.
+- **Entradas do usuário sempre escapadas.** Nome e descrição de configuração e o
+  campo de busca passam por `esc()` antes de virar marcação.
+- **Rotas e ações só aceitam nomes declarados** (`hasOwnProperty`): sem isso, um
+  link como `#/constructor` alcançava membros herdados de `Object.prototype` e
+  quebrava a tela.
 
 ## Acessibilidade e responsividade
 

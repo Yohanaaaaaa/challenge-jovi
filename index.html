@@ -4,39 +4,36 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+
+<!-- Política de segurança de conteúdo: nada é carregado de fora do site.
+     'unsafe-inline' aparece só em style-src, por causa dos atributos style
+     usados nas telas e da folha que o Tailwind injeta em tempo de execução.
+     connect-src 'none' garante que nenhuma foto possa ser enviada a lugar
+     nenhum. (frame-ancestors só vale como cabeçalho HTTP, então fica de fora.) -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob:;
+  media-src 'self' blob:;
+  font-src 'self';
+  connect-src 'none';
+  base-uri 'none';
+  form-action 'none'">
 <title>Jovi Câmera — fotografe melhor com ajuda da IA</title>
 <meta name="description" content="Protótipo navegável de um app de câmera inteligente: onboarding personalizado, modos guiados, coach de enquadramento e comunidade de configurações.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23000'/><circle cx='16' cy='17' r='6' fill='none' stroke='%23FFC300' stroke-width='2.5'/><path d='M6 12h4l2-3h8l2 3h4' fill='none' stroke='%23FFC300' stroke-width='2.5' stroke-linejoin='round'/></svg>">
 
-<!-- Framework: Tailwind CSS (utilitários) -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          jv: {
-            amber: '#FFC300',
-            amber2: '#E5A800',
-            ink: '#000000',
-            surface: '#0B0B0D',
-            card: '#17171A',
-            card2: '#202024',
-            line: '#2A2A30',
-            mute: '#9A9AA4'
-          }
-        },
-        fontFamily: {
-          sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif']
-        }
-      }
-    }
-  }
-</script>
+<!-- Framework: Tailwind CSS, servido pelo próprio site.
+     Antes vinha de cdn.tailwindcss.com: um script de terceiros com acesso
+     total à página (e à câmera já autorizada). Servindo local, não há
+     dependência externa e o app funciona offline. -->
+<script src="vendor/tailwind.js?v=5"></script>
+<script src="js/tailwind-config.js?v=5"></script>
 
 <!-- CSS próprio: identidade visual, componentes, cenas em CSS art e animações.
      O ?v= força o navegador a buscar a versão nova em vez da guardada em cache. -->
-<link rel="stylesheet" href="css/styles.css?v=4">
+<link rel="stylesheet" href="css/styles.css?v=5">
 </head>
 <body>
 
@@ -147,10 +144,10 @@
   </div>
 </div>
 
-<script src="js/data.js?v=4"></script>
-<script src="js/camera.js?v=4"></script>
-<script src="js/ui.js?v=4"></script>
-<script src="js/screens.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/data.js?v=5"></script>
+<script src="js/camera.js?v=5"></script>
+<script src="js/ui.js?v=5"></script>
+<script src="js/screens.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

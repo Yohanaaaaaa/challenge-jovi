@@ -839,6 +839,10 @@
       { key: 'iaAuto', label: 'IA sempre ativa', desc: 'Detectar a cena automaticamente' }
     ];
 
+    var privacidade = [
+      { key: 'guardarFotos', label: 'Guardar fotos neste navegador', desc: 'Desligado, as capturas somem ao recarregar a página' }
+    ];
+
     return `
       <section class="jv-screen">
         ${appbar({ title: 'Ajustes', menu: false })}
@@ -867,6 +871,23 @@
                       </button>`;
             }).join('')}
           </div>
+
+          <p class="jv-eyebrow mt-7 mb-3">Privacidade</p>
+          <div class="grid gap-2.5">
+            ${privacidade.map(function (t) {
+              return `<button class="jv-row" data-act="toggle" data-arg="${t.key}">
+                        <span class="jv-row__txt">
+                          <span class="jv-row__title block">${t.label}</span>
+                          <span class="jv-row__desc block">${t.desc}</span>
+                        </span>
+                        <span class="jv-switch ${state.settings[t.key] ? 'is-on' : ''}"></span>
+                      </button>`;
+            }).join('')}
+          </div>
+          <p class="text-[11px] text-jv-mute leading-relaxed mt-2.5">
+            As fotos ficam sempre no aparelho — o app não faz nenhuma chamada de rede.
+            Esta opção decide apenas se elas continuam guardadas ao fechar a página.
+          </p>
 
           <p class="jv-eyebrow mt-7 mb-3">Proporção da foto</p>
           <div class="flex gap-2">
