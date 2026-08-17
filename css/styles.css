@@ -33,6 +33,10 @@
 
   --app-w: 430px;
   --app-h: 932px;
+
+  /* espaço reservado no topo: barra de status simulada no desktop,
+     recorte seguro do aparelho no celular (ver media query no fim) */
+  --top-inset: 44px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -176,7 +180,7 @@ input, select, textarea { font: inherit; color: inherit; }
 @keyframes jv-in-back { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
 
 .jv-body { flex: 1 1 auto; min-height: 0; padding: 0 20px 24px; }
-.jv-body--pad-top { padding-top: 52px; }
+.jv-body--pad-top { padding-top: calc(var(--top-inset) + 8px); }
 
 /* Uma trilha de grade `auto` cresce até o max-content dos filhos: sem isto,
    um carrossel horizontal (que soma ~780px) estica a coluna inteira.
@@ -185,7 +189,7 @@ input, select, textarea { font: inherit; color: inherit; }
 
 /* cabeçalho padrão das telas internas */
 .jv-appbar {
-  flex: none; height: 56px; margin-top: 44px;
+  flex: none; height: 56px; margin-top: var(--top-inset);
   display: flex; align-items: center; gap: 8px; padding: 0 12px;
 }
 .jv-appbar__title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; }
@@ -197,6 +201,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .jv-iconbtn:hover { background: rgba(255, 255, 255, .08); }
 .jv-iconbtn:active { transform: scale(.92); }
 .jv-iconbtn--solid { background: rgba(0, 0, 0, .45); backdrop-filter: blur(8px); }
+
+/* barra de ações sobre uma imagem de topo (detalhe da configuração) */
+.jv-hero__bar { top: var(--top-inset); }
 
 .jv-h1 { font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; margin: 0; }
 .jv-h2 { font-size: 20px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
@@ -448,7 +455,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .jv-cam { position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; }
 
 .jv-cam__top {
-  flex: none; height: 56px; margin-top: 40px;
+  flex: none; height: 56px; margin-top: var(--top-inset);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 22px; z-index: 20;
 }
@@ -461,10 +468,12 @@ input, select, textarea { font: inherit; color: inherit; }
 .jv-cam__ctrl:active { transform: scale(.9); }
 .jv-cam__ctrl.is-on { color: var(--amber); }
 
-/* Visor */
+/* Visor — a proporção é a altura preferida, mas ele pode encolher:
+   em telas baixas isso preserva os controles em vez de cortá-los. */
 .jv-view {
   position: relative; width: 100%; overflow: hidden;
-  background: #050505; flex: none;
+  background: #050505;
+  flex: 0 1 auto; min-height: 0;
   transition: aspect-ratio .3s var(--ease);
 }
 .jv-view[data-ratio="3:4"] { aspect-ratio: 3 / 4; }
@@ -626,7 +635,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .jv-modes__item.is-on { color: var(--amber); transform: scale(1.06); }
 
 /* controles inferiores */
-.jv-cam__bottom { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+/* nunca encolhe: é o visor que cede espaço quando a tela é curta */
+.jv-cam__bottom { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
 .jv-cam__actions { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 30px; }
 
 .jv-shutter {
@@ -926,9 +936,18 @@ input, select, textarea { font: inherit; color: inherit; }
    8. Responsivo — em telas pequenas o app ocupa a viewport inteira
 ------------------------------------------------------------------ */
 @media (max-width: 780px) {
+  /* o aparelho já tem barra de status e relógio: a simulada sai de cena
+     e o topo passa a respeitar o recorte seguro da tela */
+  :root { --top-inset: max(10px, env(safe-area-inset-top)); }
+  .jv-statusbar { display: none; }
+
+  body { background: #000; }
   .jv-stage { padding: 0; gap: 0; }
   .jv-device {
-    width: 100%; height: 100vh; height: 100dvh;
+    width: 100%;
+    height: 100vh;   /* navegadores sem unidades de viewport dinâmicas */
+    height: 100svh;  /* altura com as barras do navegador visíveis:
+                        evita que os controles fiquem atrás delas no iOS */
     border-radius: 0; padding: 0; box-shadow: none; background: #000;
   }
   .jv-device__screen { border-radius: 0; }

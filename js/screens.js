@@ -364,7 +364,7 @@
             <div class="jv-view__inner absolute inset-0" style="filter:${U.toFilter(v)}">${scene(p.scene)}</div>
             <div class="jv-view__tint absolute inset-0" style="background:${U.toTint(v).background};opacity:${U.toTint(v).opacity}"></div>
             <div class="absolute inset-0" style="background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,.1) 32%,rgba(46,38,34,.92) 100%)"></div>
-            <div class="absolute top-11 inset-x-0 flex items-center justify-between px-3">
+            <div class="jv-hero__bar absolute inset-x-0 flex items-center justify-between px-3">
               <button class="jv-iconbtn jv-iconbtn--solid" data-act="back" aria-label="Voltar">${icon('ic-arrow-left')}</button>
               <button class="jv-iconbtn jv-iconbtn--solid jv-like ${liked ? 'is-on' : ''}" data-act="like" data-arg="${esc(p.id)}" aria-label="Curtir">${icon('ic-heart')}</button>
             </div>
