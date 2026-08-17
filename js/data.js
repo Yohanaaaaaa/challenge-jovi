@@ -261,7 +261,11 @@
     { id: 't4', title: 'Menos zoom, mais passos', text: 'O zoom digital corta pixels. Sempre que puder, aproxime-se do assunto.', tag: 'Nitidez' }
   ];
 
-  /* Detecções simuladas da IA por cena */
+  /* Texto da IA quando a câmera real está ligada: aqui a cena é a de
+     verdade, então a mensagem fala dos ajustes, não do conteúdo. */
+  var AI_LIVE = 'Ajustamos exposição, cor e nitidez para este tipo de cena.';
+
+  /* Detecções simuladas da IA por cena (modo demonstração) */
   var AI_DETECT = {
     paisagem: { title: 'IA: Paisagem', text: 'Céu limpo, montanhas e água. Detectamos o melhor modo para sua foto.' },
     retrato: { title: 'IA: Retrato', text: 'Rosto detectado a 1,2 m. Sugerimos desfoque de fundo médio.' },
@@ -283,6 +287,7 @@
     GOAL_TO_MODE: GOAL_TO_MODE,
     STYLE_VALUES: STYLE_VALUES,
     TIPS: TIPS,
-    AI_DETECT: AI_DETECT
+    AI_DETECT: AI_DETECT,
+    AI_LIVE: AI_LIVE
   };
 })(window);

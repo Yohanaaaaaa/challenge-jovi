@@ -56,6 +56,19 @@
     '</button>';
   }
 
+  /* Arte de uma captura: a foto ou o vídeo reais quando existirem,
+     senão a cena desenhada em CSS com os ajustes aplicados. */
+  function shotArt(s) {
+    if (s.src && s.video) {
+      return `<video class="jv-shotimg" src="${esc(s.src)}" muted playsinline loop autoplay></video>`;
+    }
+    if (s.src) {
+      return `<img class="jv-shotimg" src="${esc(s.src)}" alt="Captura em modo ${esc(s.kind)}">`;
+    }
+    return `<span class="absolute inset-0" style="filter:${U.toFilter(s.look)}">${scene(s.scene)}</span>` +
+           `<span class="absolute inset-0" style="background:${U.toTint(s.look).background};opacity:${U.toTint(s.look).opacity};mix-blend-mode:soft-light"></span>`;
+  }
+
   function modeRow(m) {
     return '<button class="jv-row" data-act="mode-open" data-arg="' + esc(m.id) + '">' +
       '<span class="jv-tile jv-tile--' + esc(m.id) + '">' + icon(m.icon) + '</span>' +
@@ -480,6 +493,10 @@
     var model = U.findMode(c.model);
     var sceneName = isDoc ? 'doc' : (model ? model.scene : 'paisagem');
     var flashIcon = c.flash === 'off' ? 'ic-bolt-off' : 'ic-bolt';
+    var live = state.live;
+    var CAM = global.JOVI_CAM;
+    /* com zoom da lente o visor não precisa (nem deve) escalar por CSS */
+    var cssZoom = state.hwZoom ? 1 : (c.zoom < 1 ? 1 : c.zoom);
 
     /* sobreposições do visor conforme o modo */
     var overlay = '';
@@ -501,14 +518,25 @@
         </button>`;
     } else if (state.aiCard && c.ai) {
       var det = D.AI_DETECT[sceneName] || D.AI_DETECT.paisagem;
+      var aiTitle = live ? 'IA: ' + (model ? model.name : 'Cena') : det.title;
+      var aiText = live ? D.AI_LIVE : det.text;
+      var aiThumb = live
+        ? `<span class="text-jv-amber">${icon('ic-sparkle', 'jv-ic--sm')}</span>`
+        : `<span class="jv-aicard__thumb">${scene(sceneName)}</span>`;
       overlay += `<div class="jv-aicard">
-          <div class="jv-aicard__head"><span class="jv-aicard__thumb">${scene(sceneName)}</span>${esc(det.title)}</div>
-          <p class="jv-aicard__txt">${esc(det.text)}</p>
+          <div class="jv-aicard__head">${aiThumb}${esc(aiTitle)}</div>
+          <p class="jv-aicard__txt">${esc(aiText)}</p>
           <button class="jv-aicard__btn" data-act="ai-more">Saber mais</button>
         </div>`;
     }
 
-    if (model && !isDoc && !state.aiCard) {
+    /* topo do visor: convite para ligar a câmera real, aviso de
+       indisponibilidade ou a etiqueta do modelo ativo */
+    if (!live && CAM.usable()) {
+      overlay += `<button class="jv-live-cta" data-act="cam-live">${icon('ic-camera', 'jv-ic--sm')} Usar a câmera do aparelho</button>`;
+    } else if (!live) {
+      overlay += `<span class="jv-live-note">${icon('ic-info', 'jv-ic--sm')} ${esc(CAM.reason())}</span>`;
+    } else if (model && !isDoc && !state.aiCard) {
       overlay += `<div class="jv-badge">${icon('ic-sparkle', 'jv-ic--sm')}${esc(model.name)}</div>`;
     }
     if (state.recording) {
@@ -537,8 +565,8 @@
         </div>
 
         <div class="jv-view" data-ratio="${esc(c.ratio)}" data-act="focus" id="jv-view">
-          <div class="jv-view__inner" style="filter:${U.toFilter(look)};transform:scale(${c.zoom < 1 ? 1 : c.zoom})${c.front ? ' scaleX(-1)' : ''}">
-            ${scene(sceneName)}
+          <div class="jv-view__inner" id="jv-inner" style="filter:${U.toFilter(look)};transform:scale(${cssZoom})${c.front ? ' scaleX(-1)' : ''}">
+            ${live ? '' : scene(sceneName)}
           </div>
           <div class="jv-view__tint" style="background:${U.toTint(look).background};opacity:${U.toTint(look).opacity}"></div>
           <div class="jv-grid ${state.settings.grade ? 'is-on' : ''}"></div>
@@ -558,7 +586,7 @@
 
           <div class="jv-cam__actions">
             <button class="jv-thumb ${state.thumbPop ? 'jv-thumb--pop' : ''}" data-act="goto" data-arg="galeria" aria-label="Abrir galeria">
-              <span class="absolute inset-0" style="filter:${U.toFilter(last ? last.look : look)}">${scene(last ? last.scene : sceneName)}</span>
+              ${last ? shotArt(last) : `<span class="absolute inset-0" style="filter:${U.toFilter(look)}">${scene(sceneName)}</span>`}
             </button>
             <button class="jv-shutter ${isVideo ? (state.recording ? 'jv-shutter--rec' : 'jv-shutter--video') : ''}"
                     data-act="shutter" aria-label="${isVideo ? 'Gravar' : 'Tirar foto'}"></button>
@@ -581,8 +609,7 @@
             <div class="jv-gal">
               ${state.shots.map(function (s) {
                 return `<button class="jv-gal__cell" data-act="shot-open" data-arg="${esc(s.id)}">
-                          <span class="absolute inset-0" style="filter:${U.toFilter(s.look)}">${scene(s.scene)}</span>
-                          <span class="absolute inset-0" style="background:${U.toTint(s.look).background};opacity:${U.toTint(s.look).opacity};mix-blend-mode:soft-light"></span>
+                          ${shotArt(s)}
                           <span class="jv-gal__tag">${esc(s.kind)}</span>
                         </button>`;
               }).join('')}
@@ -615,11 +642,12 @@
         </header>
         <div class="jv-body jv-scroll px-0">
           <div class="relative w-full" style="aspect-ratio:${s.ratio.replace(':', '/')}">
-            <div class="absolute inset-0" style="filter:${U.toFilter(s.look)}">${scene(s.scene)}</div>
-            <div class="absolute inset-0" style="background:${U.toTint(s.look).background};opacity:${U.toTint(s.look).opacity};mix-blend-mode:soft-light"></div>
+            ${s.src && s.video
+              ? `<video class="jv-shotimg" src="${esc(s.src)}" controls playsinline></video>`
+              : shotArt(s)}
           </div>
           <div class="px-5 pt-5">
-            <p class="text-xs text-jv-mute">${esc(s.time)} · proporção ${esc(s.ratio)} · zoom ${String(s.zoom).replace('.', ',')}x</p>
+            <p class="text-xs text-jv-mute">${esc(s.time)} · proporção ${esc(s.ratio)} · zoom ${String(s.zoom).replace('.', ',')}x${s.src ? ' · captura real' : ''}</p>
             <p class="text-lg font-semibold mt-1">${esc(s.label)}</p>
             <div class="jv-card mt-4 p-4">
               <span class="jv-eyebrow">Como esta foto foi tratada</span>
@@ -770,7 +798,19 @@
       <section class="jv-screen">
         ${appbar({ title: 'Ajustes', menu: false })}
         <div class="jv-body jv-scroll">
-          <p class="jv-eyebrow mb-3">Captura</p>
+          <p class="jv-eyebrow mb-3">Câmera do aparelho</p>
+          <button class="jv-row" data-act="cam-live" ${global.JOVI_CAM.usable() ? '' : 'disabled'}>
+            <span class="jv-tile jv-tile--paisagem">${icon('ic-camera')}</span>
+            <span class="jv-row__txt">
+              <span class="jv-row__title block">Usar a câmera real</span>
+              <span class="jv-row__desc block">${global.JOVI_CAM.usable()
+                ? 'Mostra a imagem da câmera no visor e salva fotos de verdade'
+                : esc(global.JOVI_CAM.reason())}</span>
+            </span>
+            <span class="jv-switch ${state.live ? 'is-on' : ''}"></span>
+          </button>
+
+          <p class="jv-eyebrow mt-7 mb-3">Captura</p>
           <div class="grid gap-2.5">
             ${toggles.map(function (t) {
               return `<button class="jv-row" data-act="toggle" data-arg="${t.key}">

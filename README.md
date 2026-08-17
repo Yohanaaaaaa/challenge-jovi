@@ -18,6 +18,12 @@ Não há instalação nem etapa de build.
 > Todo o resto — layout, componentes, animações e as “fotos” — está em
 > `css/styles.css`, que é local.
 
+**Para usar a câmera de verdade**, o app precisa estar servido por HTTPS ou
+`localhost`: os navegadores bloqueiam `getUserMedia` em `file://`. Publicado no
+GitHub Pages funciona direto; localmente, sirva a pasta (por exemplo
+`npx serve` ou `python -m http.server`) e acesse por `http://localhost`.
+Sem isso o app continua funcionando com a demonstração desenhada em CSS.
+
 Para reiniciar o protótipo do zero (limpa o onboarding, as capturas e as
 configurações criadas), rode no console do navegador:
 
@@ -50,6 +56,7 @@ challenge-jovi/
 │   └── styles.css      tokens, componentes, câmera, cenas em CSS art, animações
 └── js/
     ├── data.js         modos, configurações da comunidade, dicas, onboarding
+    ├── camera.js       câmera do aparelho: getUserMedia, captura e gravação
     ├── ui.js           helpers de marcação, cenas, filtros, toast e folha modal
     ├── screens.js      as 14 telas do app (cada uma devolve sua marcação)
     └── app.js          estado, roteador, ações e lógica da câmera
@@ -86,6 +93,33 @@ precisar de servidor local.
 | **MAIS** | Abre a tela de Modos. |
 
 ---
+
+## Câmera real
+
+No visor há o botão **“Usar a câmera do aparelho”** (também disponível em
+*Ajustes*). Ao tocar nele, o app pede permissão e passa a mostrar a imagem da
+câmera no lugar da cena desenhada — daí para frente tudo funciona sobre o vídeo
+real:
+
+- **Foto** — o quadro vai para um `<canvas>` com os mesmos filtros do visor e é
+  salvo como JPEG na galeria. O recorte respeita a proporção escolhida (3:4, 1:1
+  ou 9:16) e o zoom ativo.
+- **Documento** — mesma captura, com o contraste do modo aplicado.
+- **Vídeo** — grava de verdade com `MediaRecorder` (sem áudio, para não pedir o
+  microfone). O arquivo fica disponível durante a sessão.
+- **Virar a câmera** troca entre frontal e traseira; a frontal aparece
+  espelhada, como em qualquer app de selfie.
+- **Flash** aciona a lanterna nos aparelhos que expõem `torch`; **zoom** usa a
+  lente quando o navegador oferece `zoom` e, quando não, recorta por CSS.
+- Ao sair do visor o fluxo é encerrado, então a luz da câmera não fica acesa.
+
+A detecção de cena da IA continua sendo simulada — o que é real é a câmera, a
+captura e os ajustes aplicados. Sem permissão, sem câmera ou fora de HTTPS, o
+app avisa e segue com a demonstração em CSS, sem quebrar nenhuma tela.
+
+As fotos ficam no `localStorage`, que é pequeno: o app guarda as imagens das
+seis capturas mais recentes e, se o espaço acabar, descarta as mais antigas
+(a captura continua na galeria, exibindo a cena correspondente).
 
 ## Detalhes de implementação
 

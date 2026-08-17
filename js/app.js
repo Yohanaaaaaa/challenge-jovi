@@ -8,6 +8,7 @@
   var D = global.JOVI_DATA;
   var U = global.JOVI_UI;
   var S = global.JOVI_SCREENS;
+  var CAM = global.JOVI_CAM;
 
   var STORAGE_KEY = 'jovi.state.v1';
   var root = U.byId('app');
@@ -54,21 +55,52 @@
       recording: false,
       recLabel: '00:00',
       thumbPop: false,
-      focusSearch: false
+      focusSearch: false,
+
+      /* câmera do aparelho */
+      liveWanted: false,   /* preferência do usuário (persistida) */
+      live: false,         /* fluxo realmente ativo agora */
+      hwZoom: false,       /* o zoom foi feito pela lente, não por CSS */
+      realRec: false
     };
   }
 
   var state = defaults();
 
-  var PERSIST = ['onboarded', 'profile', 'camera', 'settings', 'look', 'lookName', 'liked', 'saved', 'customPresets', 'shots'];
+  var PERSIST = ['onboarded', 'profile', 'camera', 'settings', 'look', 'lookName', 'liked', 'saved', 'customPresets', 'shots', 'liveWanted'];
+
+  /* Fotos reais são grandes: guarda as mais recentes e, se o espaço
+     acabar, vai descartando as imagens antigas (a captura continua na
+     galeria, exibindo a cena correspondente). */
+  var KEEP_IMAGES = 6;
 
   function save() {
-    try {
-      var out = {};
-      PERSIST.forEach(function (k) { out[k] = state[k]; });
-      out.shots = state.shots.slice(0, 30);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
-    } catch (e) { /* modo privado / file:// sem storage */ }
+    var out = {};
+    PERSIST.forEach(function (k) { out[k] = state[k]; });
+
+    /* vídeos ficam em blob URL, que não sobrevive ao recarregamento */
+    var shots = state.shots.slice(0, 24)
+      .filter(function (s) { return !s.video; })
+      .map(function (s) { return Object.assign({}, s); });
+
+    var kept = 0;
+    shots.forEach(function (s) {
+      if (!s.src) return;
+      kept++;
+      if (kept > KEEP_IMAGES) delete s.src;
+    });
+    out.shots = shots;
+
+    for (var tries = 0; tries < 10; tries++) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(out)); return; }
+      catch (e) {
+        var dropped = false;
+        for (var i = out.shots.length - 1; i >= 0; i--) {
+          if (out.shots[i].src) { delete out.shots[i].src; dropped = true; break; }
+        }
+        if (!dropped) return; /* modo privado ou storage indisponível */
+      }
+    }
   }
 
   function load() {
@@ -129,7 +161,11 @@
   function onEnter(screen) {
     state.aiCard = false;
     state.scanning = false;
-    if (screen !== 'camera') stopRecording(true);
+    if (screen !== 'camera') {
+      stopRecording(true);
+      /* libera a câmera ao sair do visor: nada de luz acesa à toa */
+      if (state.live) { CAM.stop(); state.live = false; }
+    }
     if (screen === 'explorar') state.focusSearch = false;
     if (screen === 'criar' && !state.draftName) state.draft = Object.assign({}, state.look);
   }
@@ -217,11 +253,67 @@
     track.style.transform = 'translateX(' + (-offset) + 'px)';
   }
 
+  /* ---------------------------------------------------------
+     Câmera do aparelho
+  --------------------------------------------------------- */
+  var starting = false;
+
+  function camError(err) {
+    var name = err && err.name;
+    if (name === 'NotAllowedError' || name === 'SecurityError') return 'Permissão negada. Autorize a câmera nas configurações do navegador.';
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'Nenhuma câmera encontrada neste aparelho.';
+    if (name === 'NotReadableError') return 'A câmera está sendo usada por outro aplicativo.';
+    return (err && err.message) || 'Não foi possível abrir a câmera.';
+  }
+
+  function applyZoom(z) {
+    state.hwZoom = state.live ? CAM.setZoom(z) : false;
+  }
+
+  function applyTorch() {
+    if (state.live) CAM.setTorch(state.camera.flash === 'on');
+  }
+
+  function startLive() {
+    if (starting) return Promise.resolve(false);
+    starting = true;
+    return CAM.start(state.camera.front ? 'front' : 'back')
+      .then(function () {
+        starting = false;
+        state.live = true;
+        state.liveWanted = true;
+        applyZoom(state.camera.zoom);
+        applyTorch();
+        render();
+        return true;
+      })
+      .catch(function (err) {
+        starting = false;
+        state.live = false;
+        state.liveWanted = false;
+        render();
+        U.toast(camError(err));
+        return false;
+      });
+  }
+
+  function stopLive() {
+    CAM.stop();
+    state.live = false;
+    state.liveWanted = false;
+    state.hwZoom = false;
+    render();
+  }
+
   function setupCamera() {
     /* duas passagens: a segunda corrige a medida depois que a fonte
        e o espaçamento entre letras já foram aplicados */
     requestAnimationFrame(centerModes);
     later(centerModes, 120);
+
+    /* religa a câmera real se o usuário já a tinha escolhido */
+    if (!state.live && state.liveWanted && CAM.usable() && !starting) startLive();
+    if (state.live) CAM.attach(U.byId('jv-inner'));
 
     var c = state.camera;
 
@@ -278,7 +370,12 @@
     return 'Foto';
   }
 
-  function pushShot(kind) {
+  function ratioValue(r) {
+    var p = String(r).split(':');
+    return (parseFloat(p[0]) || 3) / (parseFloat(p[1]) || 4);
+  }
+
+  function pushShot(kind, src, isVideo) {
     var now = new Date();
     state.shots.unshift({
       id: 's' + now.getTime(),
@@ -288,6 +385,8 @@
       zoom: state.camera.zoom,
       kind: kind || kindForCamera(),
       label: state.lookName,
+      src: src || null,
+      video: !!isVideo,
       time: now.toLocaleDateString('pt-BR') + ' · ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')
     });
     if (state.shots.length > 30) state.shots.length = 30;
@@ -297,7 +396,21 @@
   function capture() {
     U.flash();
     U.buzz(18);
-    pushShot();
+
+    /* com a câmera real, o quadro vai para um canvas com os mesmos
+       ajustes do visor — a foto salva é o que se vê */
+    var src = null;
+    if (state.live) {
+      src = CAM.capture({
+        ratio: ratioValue(state.camera.ratio),
+        zoom: state.hwZoom ? 1 : state.camera.zoom,
+        filter: U.toFilter(state.look),
+        tint: U.toTint(state.look),
+        mirror: state.camera.front && state.settings.espelhar
+      });
+    }
+
+    pushShot(null, src);
     render();
     U.toast(kindForCamera() + ' salva na galeria');
   }
@@ -317,9 +430,16 @@
       later(function () {
         state.scanning = false;
         U.flash();
-        pushShot('Documento');
+        var src = state.live ? CAM.capture({
+          ratio: ratioValue(c.ratio),
+          zoom: state.hwZoom ? 1 : c.zoom,
+          filter: U.toFilter(state.look),
+          tint: U.toTint(state.look),
+          mirror: c.front && state.settings.espelhar
+        }) : null;
+        pushShot('Documento', src);
         render();
-        U.toast('Documento escaneado e salvo em PDF');
+        U.toast('Documento escaneado e salvo na galeria');
       }, 1700);
       return;
     }
@@ -361,6 +481,8 @@
     state.recording = true;
     recStart = Date.now();
     state.recLabel = '00:00';
+    /* grava de verdade quando a câmera do aparelho está ligada */
+    state.realRec = state.live && CAM.canRecord() ? CAM.startRec() : false;
     render();
     every(function () {
       if (!state.recording) return;
@@ -374,6 +496,21 @@
   function stopRecording(silent) {
     if (!state.recording) return;
     state.recording = false;
+
+    var wasReal = state.realRec;
+    state.realRec = false;
+
+    if (wasReal) {
+      var label = state.recLabel;
+      CAM.stopRec().then(function (url) {
+        if (silent) { if (url) URL.revokeObjectURL(url); return; }
+        pushShot('Vídeo', url, !!url);
+        render();
+        U.toast('Vídeo de ' + label + ' salvo na galeria');
+      });
+      return;
+    }
+
     if (!silent) {
       pushShot('Vídeo');
       render();
@@ -487,12 +624,25 @@
       render();
       U.buzz(10);
     },
+    'cam-live': function () {
+      if (state.live) { stopLive(); U.toast('Câmera desligada — voltando à demonstração'); return; }
+      if (!CAM.usable()) { U.toast(CAM.reason()); return; }
+      /* fora do visor, liga ao chegar lá: assim o fluxo nunca fica
+         aberto numa tela que não mostra a imagem */
+      if (state.screen !== 'camera') { state.liveWanted = true; go('camera', { force: true }); return; }
+      U.toast('Abrindo a câmera…');
+      startLive().then(function (ok) { if (ok) U.toast('Câmera ligada'); });
+    },
+
     'cam-flash': function () {
       var seq = ['off', 'auto', 'on'];
       var next = seq[(seq.indexOf(state.camera.flash) + 1) % seq.length];
       state.camera.flash = next;
+      applyTorch();
       render();
-      U.toast('Flash: ' + (next === 'off' ? 'desligado' : next === 'auto' ? 'automático' : 'ligado'));
+      var msg = 'Flash: ' + (next === 'off' ? 'desligado' : next === 'auto' ? 'automático' : 'ligado');
+      if (state.live && next === 'on' && !CAM.hasTorch()) msg += ' (sem lanterna neste aparelho)';
+      U.toast(msg);
     },
     'cam-hdr': function () {
       state.camera.hdr = !state.camera.hdr;
@@ -513,6 +663,7 @@
     },
     'cam-zoom': function (arg) {
       state.camera.zoom = parseFloat(arg);
+      applyZoom(state.camera.zoom);   /* usa a lente quando o aparelho permite */
       render();
     },
     'cam-timer': function (arg) {
@@ -525,6 +676,11 @@
       state.camera.front = !state.camera.front;
       render();
       U.toast(state.camera.front ? 'Câmera frontal' : 'Câmera traseira');
+      if (state.live) {
+        CAM.start(state.camera.front ? 'front' : 'back')
+          .then(function () { applyZoom(state.camera.zoom); applyTorch(); render(); })
+          .catch(function (err) { state.live = false; render(); U.toast(camError(err)); });
+      }
     },
     'coach-next': function () {
       state.coachStep++;
@@ -615,7 +771,10 @@
     /* Galeria */
     'shot-open': function (arg) { state.viewShot = arg; go('foto', { force: true }); },
     'shot-delete': function (arg) {
-      state.shots = state.shots.filter(function (s) { return s.id !== arg; });
+      state.shots = state.shots.filter(function (s) {
+        if (s.id === arg && s.video && s.src) { try { URL.revokeObjectURL(s.src); } catch (e) {} }
+        return s.id !== arg;
+      });
       back();
       U.toast('Captura excluída');
     },
