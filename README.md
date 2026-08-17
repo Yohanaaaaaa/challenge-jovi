@@ -96,10 +96,15 @@ precisar de servidor local.
 
 ## Câmera real
 
-No visor há o botão **“Usar a câmera do aparelho”** (também disponível em
-*Ajustes*). Ao tocar nele, o app pede permissão e passa a mostrar a imagem da
-câmera no lugar da cena desenhada — daí para frente tudo funciona sobre o vídeo
-real:
+Abrir o visor **é** pedir a câmera: `navigator.mediaDevices.getUserMedia()` é
+chamado assim que a tela da câmera aparece, sem depender de nenhum botão. O
+pedido sai em uma *microtask* logo após a renderização, ainda dentro do toque
+que abriu a tela — o que preserva o gesto do usuário exigido pelo Safari.
+
+As restrições são tentadas da mais desejável para a mais permissiva
+(`facingMode` + 1920×1080 → `facingMode` → `video: true`), e há um limite de
+15 segundos para o caso de a promessa nunca se resolver. Daí para frente tudo
+funciona sobre o vídeo real:
 
 - **Foto** — o quadro vai para um `<canvas>` com os mesmos filtros do visor e é
   salvo como JPEG na galeria. O recorte respeita a proporção escolhida (3:4, 1:1

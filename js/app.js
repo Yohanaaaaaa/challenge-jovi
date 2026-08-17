@@ -63,6 +63,7 @@
       hwZoom: false,       /* o zoom foi feito pela lente, não por CSS */
       realRec: false,
       camError: null,      /* último erro, mostrado no visor */
+      camStarting: false,  /* pedido em andamento (o navegador está perguntando) */
       camDiag: '',         /* navegador / protocolo / câmeras vistas */
       liveDismissed: false
     };
@@ -260,12 +261,14 @@
      Câmera do aparelho
   --------------------------------------------------------- */
   var starting = false;
+  var autoPending = false;
 
   function camError(err) {
     var name = err && err.name;
     if (name === 'NotAllowedError' || name === 'SecurityError') return 'Permissão negada. Autorize a câmera nas configurações do navegador.';
     if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'Nenhuma câmera encontrada neste aparelho.';
     if (name === 'NotReadableError') return 'A câmera está sendo usada por outro aplicativo.';
+    if (name === 'TimeoutError') return (err && err.message) || 'A câmera não respondeu.';
     return (err && err.message) || 'Não foi possível abrir a câmera.';
   }
 
@@ -277,12 +280,15 @@
     if (state.live) CAM.setTorch(state.camera.flash === 'on');
   }
 
-  function startLive() {
+  function startLive(silencioso) {
     if (starting) return Promise.resolve(false);
     starting = true;
+    state.camStarting = true;
+    if (!silencioso) render();
     return CAM.start(state.camera.front ? 'front' : 'back')
       .then(function () {
         starting = false;
+        state.camStarting = false;
         state.live = true;
         state.liveWanted = true;
         state.camError = null;
@@ -293,6 +299,7 @@
       })
       .catch(function (err) {
         starting = false;
+        state.camStarting = false;
         state.live = false;
         state.liveWanted = false;
         /* o erro fica visível no visor, com diagnóstico e opção de repetir.
@@ -315,6 +322,8 @@
     state.live = false;
     state.liveWanted = false;
     state.hwZoom = false;
+    /* desligar é uma escolha: não reabre sozinha em seguida */
+    state.liveDismissed = true;
     render();
   }
 
@@ -324,8 +333,19 @@
     requestAnimationFrame(centerModes);
     later(centerModes, 120);
 
-    /* religa a câmera real se o usuário já a tinha escolhido */
-    if (!state.live && state.liveWanted && CAM.usable() && !starting) startLive();
+    /* Abrir o visor é pedir a câmera: getUserMedia é chamado direto, sem
+       depender de o usuário achar um botão. Só não insiste se já falhou
+       nesta sessão ou se ele escolheu ficar na demonstração.
+       O pedido sai fora deste ciclo para não renderizar dentro do render. */
+    if (!state.live && !starting && !autoPending && CAM.usable() && !state.camError && !state.liveDismissed) {
+      autoPending = true;
+      /* microtask, e não later(): timers são limpos a cada render, o que
+         cancelaria o pedido se outra renderização acontecesse no meio */
+      Promise.resolve().then(function () {
+        autoPending = false;
+        if (state.screen === 'camera' && !state.live) startLive();
+      });
+    }
     if (state.live) CAM.attach(U.byId('jv-inner'));
 
     /* diagnóstico levantado uma única vez, para o painel de erro */

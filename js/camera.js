@@ -102,6 +102,19 @@
   /* ---------------------------------------------------------
      Liga / desliga
   --------------------------------------------------------- */
+  /* Tenta as restrições em ordem, da mais desejável para a mais permissiva.
+     Erro de permissão não adianta repetir com outras restrições. */
+  function tryConstraints(list, i) {
+    i = i || 0;
+    return navigator.mediaDevices.getUserMedia(list[i]).catch(function (err) {
+      var permissao = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+      if (permissao || i >= list.length - 1) throw err;
+      return tryConstraints(list, i + 1);
+    });
+  }
+
+  var LIMITE_MS = 15000;
+
   function start(facing) {
     if (!usable()) return Promise.reject(new Error(reason()));
 
@@ -109,32 +122,44 @@
     element();
 
     var wanted = facing === 'front' ? 'user' : 'environment';
-    var constraints = {
-      audio: false,
-      video: {
-        facingMode: { ideal: wanted },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    };
+    var lista = [
+      { audio: false, video: { facingMode: { ideal: wanted }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+      { audio: false, video: { facingMode: wanted } },
+      { audio: false, video: true }
+    ];
 
-    return navigator.mediaDevices.getUserMedia(constraints)
-      .catch(function (err) {
-        /* alguns aparelhos recusam facingMode: tenta sem essa restrição */
-        if (err && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
-          return navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    return new Promise(function (resolve, reject) {
+      var expirou = false;
+
+      /* sem isto o app pode ficar preso em "abrindo a câmera" para sempre:
+         há navegadores em que a promessa simplesmente nunca se resolve */
+      var timer = setTimeout(function () {
+        expirou = true;
+        var e = new Error('A câmera não respondeu. Feche outros apps que possam estar usando a câmera e tente de novo.');
+        e.name = 'TimeoutError';
+        reject(e);
+      }, LIMITE_MS);
+
+      tryConstraints(lista).then(function (s) {
+        if (expirou) {
+          /* chegou tarde: descarta para não deixar a câmera ligada */
+          s.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+          return;
         }
-        throw err;
-      })
-      .then(function (s) {
+        clearTimeout(timer);
         stream = s;
         track = s.getVideoTracks()[0] || null;
         caps = (track && track.getCapabilities) ? (track.getCapabilities() || {}) : {};
         video.srcObject = s;
         var p = video.play();
         if (p && p.catch) p.catch(function () {});
-        return true;
+        resolve(true);
+      }, function (err) {
+        if (expirou) return;
+        clearTimeout(timer);
+        reject(err);
       });
+    });
   }
 
   function stopTracks() {

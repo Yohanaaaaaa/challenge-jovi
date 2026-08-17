@@ -76,6 +76,16 @@
     var err = state.camError;
     var bloqueado = !CAM.usable();
 
+    /* pedindo agora: o navegador está mostrando o aviso de permissão */
+    if (state.camStarting) {
+      return `
+        <div class="jv-live-panel">
+          <span class="jv-live-panel__ic jv-pulse">${icon('ic-camera')}</span>
+          <p class="jv-live-panel__title">Abrindo a câmera…</p>
+          <p class="jv-live-panel__txt">Toque em <b>Permitir</b> no aviso do navegador para usar a câmera do seu celular.</p>
+        </div>`;
+    }
+
     var titulo = err ? 'Não consegui abrir a câmera'
       : bloqueado ? 'Câmera indisponível aqui'
       : 'Ver a imagem real';
@@ -564,7 +574,7 @@
 
     /* estado da câmera real: painel explicativo enquanto o usuário não
        decidiu, atalho discreto depois, e a etiqueta do modelo quando ao vivo */
-    var showPanel = !live && (!state.liveDismissed || state.camError);
+    var showPanel = !live && (state.camStarting || !state.liveDismissed || state.camError);
     if (showPanel) {
       overlay += livePanel(state);
     } else if (!live && CAM.usable()) {
