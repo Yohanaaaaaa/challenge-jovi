@@ -115,7 +115,12 @@ real:
 
 A detecção de cena da IA continua sendo simulada — o que é real é a câmera, a
 captura e os ajustes aplicados. Sem permissão, sem câmera ou fora de HTTPS, o
-app avisa e segue com a demonstração em CSS, sem quebrar nenhuma tela.
+app avisa no próprio visor, mostra o motivo (com uma linha de diagnóstico:
+navegador, protocolo e quantas câmeras foram encontradas) e segue com a
+demonstração em CSS, sem quebrar nenhuma tela.
+
+> **Navegadores embutidos em apps** (WhatsApp, Instagram, Facebook) bloqueiam a
+> câmera. O app detecta essa situação e orienta a abrir no Safari ou no Chrome.
 
 As fotos ficam no `localStorage`, que é pequeno: o app guarda as imagens das
 seis capturas mais recentes e, se o espaço acabar, descarta as mais antigas

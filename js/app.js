@@ -61,7 +61,10 @@
       liveWanted: false,   /* preferência do usuário (persistida) */
       live: false,         /* fluxo realmente ativo agora */
       hwZoom: false,       /* o zoom foi feito pela lente, não por CSS */
-      realRec: false
+      realRec: false,
+      camError: null,      /* último erro, mostrado no visor */
+      camDiag: '',         /* navegador / protocolo / câmeras vistas */
+      liveDismissed: false
     };
   }
 
@@ -282,6 +285,7 @@
         starting = false;
         state.live = true;
         state.liveWanted = true;
+        state.camError = null;
         applyZoom(state.camera.zoom);
         applyTorch();
         render();
@@ -291,8 +295,17 @@
         starting = false;
         state.live = false;
         state.liveWanted = false;
+        /* o erro fica visível no visor, com diagnóstico e opção de repetir.
+           O diagnóstico básico é síncrono: a contagem de câmeras depende de
+           enumerateDevices, que nem sempre responde. */
+        state.camError = { name: (err && err.name) || 'Error', message: camError(err) };
+        state.camDiag = CAM.diagnose() + ' · ' + ((err && err.name) || 'erro');
         render();
-        U.toast(camError(err));
+        CAM.countCameras().then(function (n) {
+          if (n < 0) return;
+          state.camDiag = CAM.diagnose(n) + ' · ' + ((err && err.name) || 'erro');
+          if (state.screen === 'camera') render();
+        });
         return false;
       });
   }
@@ -314,6 +327,16 @@
     /* religa a câmera real se o usuário já a tinha escolhido */
     if (!state.live && state.liveWanted && CAM.usable() && !starting) startLive();
     if (state.live) CAM.attach(U.byId('jv-inner'));
+
+    /* diagnóstico levantado uma única vez, para o painel de erro */
+    if (!state.camDiag && !state.live) {
+      state.camDiag = CAM.diagnose();
+      CAM.countCameras().then(function (n) {
+        if (n < 0) return;
+        state.camDiag = CAM.diagnose(n);
+        if (state.screen === 'camera' && !state.live) render();
+      });
+    }
 
     var c = state.camera;
 
@@ -568,7 +591,8 @@
         '<p class="jv-eyebrow">Sobre o protótipo</p>' +
         '<h2 class="jv-h2 mt-2">Jovi Câmera</h2>' +
         '<p class="text-sm text-jv-mute leading-relaxed mt-2">Jornada navegável de um app de câmera com IA: onboarding que personaliza a recomendação, modos guiados, coach de enquadramento e comunidade de configurações.</p>' +
-        '<p class="text-sm text-jv-mute leading-relaxed mt-3">Construído apenas com HTML, CSS, JavaScript e Tailwind CSS. As fotos do visor são desenhadas em CSS puro — não há imagens externas — e os ajustes usam filtros CSS aplicados em tempo real.</p>' +
+        '<p class="text-sm text-jv-mute leading-relaxed mt-3">Construído apenas com HTML, CSS, JavaScript e Tailwind CSS. A câmera do aparelho entra pelo visor quando autorizada; sem ela, as cenas são desenhadas em CSS puro e os ajustes usam filtros CSS em tempo real.</p>' +
+        '<p class="jv-live-diag mt-3">versão ' + U.esc(D.VERSION) + ' · ' + U.esc(CAM.diagnose()) + '</p>' +
         '<button class="jv-btn jv-btn--ghost jv-btn--block mt-5" data-act="sheet-close">Fechar</button>' +
       '</div>'
     );
@@ -624,6 +648,12 @@
       render();
       U.buzz(10);
     },
+    'live-dismiss': function () {
+      state.liveDismissed = true;
+      state.camError = null;
+      render();
+    },
+
     'cam-live': function () {
       if (state.live) { stopLive(); U.toast('Câmera desligada — voltando à demonstração'); return; }
       if (!CAM.usable()) { U.toast(CAM.reason()); return; }

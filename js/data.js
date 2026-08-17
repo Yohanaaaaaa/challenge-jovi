@@ -277,7 +277,12 @@
     sol: { title: 'IA: Pôr do sol', text: 'Céu alaranjado detectado. Realçamos as cores quentes da cena.' }
   };
 
+  /* Marcador de versão: aparece em "Sobre o protótipo" e ajuda a saber
+     se o navegador está mostrando a versão nova ou uma guardada em cache. */
+  var VERSION = '3 · câmera real';
+
   global.JOVI_DATA = {
+    VERSION: VERSION,
     MODES: MODES,
     CAM_MODES: CAM_MODES,
     PRESETS: PRESETS,

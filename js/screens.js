@@ -69,6 +69,38 @@
            `<span class="absolute inset-0" style="background:${U.toTint(s.look).background};opacity:${U.toTint(s.look).opacity};mix-blend-mode:soft-light"></span>`;
   }
 
+  /* Painel que explica o estado da câmera real: convite, erro com
+     diagnóstico ou instrução quando o navegador bloqueia o acesso. */
+  function livePanel(state) {
+    var CAM = global.JOVI_CAM;
+    var err = state.camError;
+    var bloqueado = !CAM.usable();
+
+    var titulo = err ? 'Não consegui abrir a câmera'
+      : bloqueado ? 'Câmera indisponível aqui'
+      : 'Ver a imagem real';
+    var texto = err ? err.message
+      : bloqueado ? CAM.reason()
+      : 'Toque para usar a câmera do seu celular — as fotos ficam reais.';
+
+    var dica = CAM.inAppBrowser()
+      ? 'Toque no menu do app (••• ou ⇧) e escolha “Abrir no Safari” / “Abrir no navegador”.'
+      : (err && err.name === 'NotAllowedError')
+        ? 'Toque no ícone à esquerda da barra de endereço e libere a câmera para este site.'
+        : '';
+
+    return `
+      <div class="jv-live-panel">
+        <span class="jv-live-panel__ic">${icon('ic-camera')}</span>
+        <p class="jv-live-panel__title">${esc(titulo)}</p>
+        <p class="jv-live-panel__txt">${esc(texto)}</p>
+        ${dica ? `<p class="jv-live-panel__hint">${esc(dica)}</p>` : ''}
+        ${bloqueado ? '' : `<button class="jv-btn jv-btn--primary jv-btn--sm jv-btn--block mt-4" data-act="cam-live">${err ? 'Tentar de novo' : 'Ativar câmera'}</button>`}
+        ${(err || bloqueado) && state.camDiag ? `<p class="jv-live-diag">${esc(state.camDiag)}</p>` : ''}
+        <button class="jv-live-panel__skip" data-act="live-dismiss">Continuar na demonstração</button>
+      </div>`;
+  }
+
   function modeRow(m) {
     return '<button class="jv-row" data-act="mode-open" data-arg="' + esc(m.id) + '">' +
       '<span class="jv-tile jv-tile--' + esc(m.id) + '">' + icon(m.icon) + '</span>' +
@@ -530,9 +562,12 @@
         </div>`;
     }
 
-    /* topo do visor: convite para ligar a câmera real, aviso de
-       indisponibilidade ou a etiqueta do modelo ativo */
-    if (!live && CAM.usable()) {
+    /* estado da câmera real: painel explicativo enquanto o usuário não
+       decidiu, atalho discreto depois, e a etiqueta do modelo quando ao vivo */
+    var showPanel = !live && (!state.liveDismissed || state.camError);
+    if (showPanel) {
+      overlay += livePanel(state);
+    } else if (!live && CAM.usable()) {
       overlay += `<button class="jv-live-cta" data-act="cam-live">${icon('ic-camera', 'jv-ic--sm')} Usar a câmera do aparelho</button>`;
     } else if (!live) {
       overlay += `<span class="jv-live-note">${icon('ic-info', 'jv-ic--sm')} ${esc(CAM.reason())}</span>`;

@@ -29,10 +29,50 @@
 
   function usable() { return supported() && secure(); }
 
+  /* Navegadores embutidos em apps (WhatsApp, Instagram, Facebook…) costumam
+     bloquear a câmera. No iOS eles se identificam como "Mobile/" sem
+     "Safari/", que é o jeito prático de reconhecê-los. */
+  function inAppBrowser() {
+    var ua = navigator.userAgent || '';
+    if (/FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|MicroMessenger|Snapchat|TikTok/i.test(ua)) return true;
+    var ios = /iPhone|iPad|iPod/i.test(ua);
+    if (ios && /Mobile\//.test(ua) && !/Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua)) return true;
+    return false;
+  }
+
   function reason() {
     if (!supported()) return 'Este navegador não permite acesso à câmera.';
     if (!secure()) return 'Abra o site por HTTPS para usar a câmera.';
+    if (inAppBrowser()) return 'Abra no Safari ou no Chrome: o navegador embutido do app bloqueia a câmera.';
     return '';
+  }
+
+  /* Quantas câmeras o navegador enxerga (antes da permissão os nomes vêm
+     vazios, mas a contagem já ajuda a diagnosticar). */
+  function countCameras() {
+    if (!supported() || !navigator.mediaDevices.enumerateDevices) return Promise.resolve(-1);
+    return navigator.mediaDevices.enumerateDevices()
+      .then(function (list) {
+        return list.filter(function (d) { return d.kind === 'videoinput'; }).length;
+      })
+      .catch(function () { return -1; });
+  }
+
+  /* Linha curta de diagnóstico, mostrada quando algo dá errado */
+  function diagnose(cameras) {
+    var ua = navigator.userAgent || '';
+    var nav = /CriOS/i.test(ua) ? 'Chrome iOS'
+      : /FxiOS/i.test(ua) ? 'Firefox iOS'
+      : /EdgiOS/i.test(ua) ? 'Edge iOS'
+      : inAppBrowser() ? 'navegador de app'
+      : /Safari\//i.test(ua) && /Mobile\//.test(ua) ? 'Safari iOS'
+      : /Chrome\//i.test(ua) ? 'Chrome'
+      : /Safari\//i.test(ua) ? 'Safari'
+      : 'navegador desconhecido';
+    var parts = [nav, location.protocol.replace(':', '')];
+    parts.push(secure() ? 'contexto seguro' : 'contexto inseguro');
+    if (typeof cameras === 'number' && cameras >= 0) parts.push(cameras + ' câmera(s) visível(is)');
+    return parts.join(' · ');
   }
 
   function isActive() { return !!(stream && track && track.readyState === 'live'); }
@@ -228,6 +268,9 @@
     secure: secure,
     usable: usable,
     reason: reason,
+    inAppBrowser: inAppBrowser,
+    countCameras: countCameras,
+    diagnose: diagnose,
     isActive: isActive,
     element: element,
     attach: attach,
